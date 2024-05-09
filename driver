@@ -1,0 +1,165 @@
+#!/bin/bash
+
+################################################################################
+#                       Gromacs Simulation Wrapper                             #
+#                                                                              #
+# Description: Bash wrapper to run simulations in gromacs                       #
+#                                                                              #
+# Change History                                                               #
+#    Date;            User;                     Comment;            Version    #
+# 07/10/2021  BakemanStrawberryShakeman         Created             2021.7.1   #
+# 07/14/2021  BakemanStrawberryShakeman   Added flags for Ligands   2021.7.2   #
+#                                                                              #
+#                                                                              #
+################################################################################
+################################################################################
+################################################################################
+#                                                                              #
+#  Copyright (C) 2021, 2021 BakemanStrawberryShakeman                          #
+#                                                                              #
+#                                                                              #
+#  This program is free software; you can redistribute it and/or modify        #
+#  it under the terms of the GNU General Public License as published by        #
+#  the Free Software Foundation; either version 2 of the License, or           #
+#  (at your option) any later version.                                         #
+#                                                                              #
+#  This program is distributed in the hope that it will be useful,             #
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of              #
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the               #
+#  GNU General Public License for more details.                                #
+#                                                                              #
+#  You should have received a copy of the GNU General Public License           #
+#  along with this program; if not, write to the Free Software                 #
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA   #
+#                                                                              #
+################################################################################
+################################################################################
+################################################################################
+
+
+################################################################################
+# Help                                                                         #
+################################################################################
+Help () {
+   # Display Help
+   echo
+   echo "Performs Simulations in Gromacs 2021.1 for a Protein with Less Than 3 Ligands with Specified Timescale"
+   echo
+   echo "Syntax: ./driver [-h] [-v] t|p|l1|l2|l3] [Argument]"
+   echo "options:"
+   echo "h     Print this Help."
+   echo "v     Print software version."
+   echo "b     Box Type (e.g. triclinic, cubic, dodecahedron, octahedron)"
+   echo "p     Protein PDB File."
+   echo "l1    Ligand One Directory."
+   echo "l2    Ligand Two Directory."
+   echo "l3    Ligand Three Directory."
+   echo "t     Input Length of Simulation(ns)."
+   echo
+}
+
+################################################################################
+################################################################################
+# Main program                                                                 #
+################################################################################
+#set -x
+#set -o functrace
+SIM () {
+  
+  ###Global Variables
+  SCRIPTS_DIRECTORY=/home/taylorlab/Desktop/Simulations/Gromacs/Scripts
+  MDP_Files=/home/taylorlab/Desktop/Simulations/Gromacs/MDP
+  
+  ###Remove Old Files
+  rm *.py
+  rm *.in
+  rm *.R
+  rm *.pml
+  rm prep.sh
+  rm sim.sh
+  rm analysis.sh
+  rm -rf Figures
+  rm -rf minim
+  rm -rf npt
+  rm -rf nvt
+  rm -rf prep
+  rm -rf Processed_Trajectory
+  rm -rf rest
+  rm -rf sim
+  
+  ###Copy Bash Scripts to Working Directory
+  rsync $SCRIPTS_DIRECTORY/prep.sh .
+  rsync $SCRIPTS_DIRECTORY/sim.sh .
+  rsync $SCRIPTS_DIRECTORY/analysis.sh .
+  
+  ###Copy Analysis Scripts to Working Directory
+  rsync $SCRIPTS_DIRECTORY/*.py .
+  rsync $SCRIPTS_DIRECTORY/*.in .
+  rsync $SCRIPTS_DIRECTORY/*.R .
+  rsync $SCRIPTS_DIRECTORY/*.pml .
+  
+  ###Copy MDP Files to Working Directory
+  rsync $MDP_Files/* .
+  
+  ###Run File Prepration
+  ./prep.sh -b $box_type -p $protein_dir -a $lig1_dir -f $lig2_dir -l $lig3_dir
+  
+  ###Run Simulations
+  if [ $timescale -gt 100 ]
+  then
+    ./sim.sh -v $(bc <<< "$timescale * 1000 / 2") -p $(bc <<< "$timescale * 1000 / 2") -r $(bc <<< "$timescale * 10000 / 2") -d $(bc <<< "$timescale * 1000000/ 2")
+  else
+    ./sim.sh -v $(bc <<< "$timescale * 10000 / 2") -p $(bc <<< "$timescale * 1000 / 2") -r $(bc <<< "$timescale * 100000 / 2") -d $(bc <<< "$timescale * 1000000 / 2")
+  fi
+  
+  
+  ###Run Analysis
+  #./analysis.sh
+}
+################################################################################
+################################################################################
+################################################################################
+# Process input options.                                                       #
+################################################################################
+# Get the options
+while getopts 'hvb:p:a:f:l:t:' option; do
+   case $option in
+      h) # display Help
+         Help
+         ;;
+      v) # display Version
+         echo
+         echo "Version: 2021.7.2"
+         echo
+         ;;
+      b) box_type=${OPTARG}
+         echo "$box_type"
+         #SIM
+         ;;
+      p) protein_dir=${OPTARG}
+         echo "$protein_dir"
+         #SIM
+         ;;
+      a) lig1_dir=${OPTARG}
+         echo "$lig1_dir"
+         #SIM
+         ;;
+      f) lig2_dir=${OPTARG}
+         echo "$lig2_dir"
+         #SIM
+         ;;
+      l) lig3_dir=${OPTARG}
+         echo "$lig3_dir"
+         #SIM
+         ;;
+       t) timescale=${OPTARG}
+         echo "$timescale"
+         SIM
+         exit;;
+      \?) # incorrect option
+         echo "Error: Invalid option"
+         echo "Please use: ./driver -h"
+         echo "For help."
+         ;;
+   esac
+done
